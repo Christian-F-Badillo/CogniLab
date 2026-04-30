@@ -1,0 +1,40 @@
+{
+  "rl_policies": {
+    "greedy": {
+      "id": "greedy",
+      "name": "Greedy (Avara)",
+      "description": "Explota el conocimiento actual al 100%. Selecciona siempre la acción con el valor Q más alto. Utilizada típicamente para evaluar un modelo ya entrenado, no para entrenar (falta de exploración).",
+      "parameters": {}
+    },
+    "epsilon_greedy": {
+      "id": "epsilon_greedy",
+      "name": "Epsilon-Greedy (ε-Greedy)",
+      "description": "Equilibra exploración y explotación. Con probabilidad (1-ε) elige la mejor acción conocida (Greedy), y con probabilidad ε elige una acción completamente al azar.",
+      "parameters": {
+        "epsilon": {
+          "label": "Probabilidad de Exploración (ε)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        }
+      }
+    },
+    "softmax": {
+      "id": "softmax",
+      "name": "Softmax (Boltzmann)",
+      "description": "Asigna una probabilidad de selección a cada acción proporcional a su valor Q estimado. La temperatura (τ) controla la estocasticidad: τ altas causan exploración aleatoria, τ cercanas a 0 causan comportamiento Greedy.",
+      "parameters": {
+        "temperature": {
+          "label": "Temperatura (τ)",
+          "type": "float",
+          "min": 0.01,
+          "max": 10.0,
+          "default": 1.0,
+          "step": 0.01
+        }
+      }
+    }
+  }
+}

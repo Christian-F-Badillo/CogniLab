@@ -1,0 +1,107 @@
+{
+  "rl": {
+    "q_learning": {
+      "id": "q_learning",
+      "name": "Q-Learning (Tabular)",
+      "description": "Algoritmo de control de diferencias temporales off-policy. Aproxima la función de valor óptima Q* independientemente de la política seguida.",
+      "parameters": {
+        "lr": {
+          "label": "Tasa de Aprendizaje (α)",
+          "type": "float",
+          "min": 0.01,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        },
+        "gamma": {
+          "label": "Factor de Descuento (γ)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.95,
+          "step": 0.01
+        },
+        "epsilon": {
+          "label": "Tasa de Exploración (ε)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        }
+      }
+    },
+    "sarsa": {
+      "id": "sarsa",
+      "name": "SARSA",
+      "description": "Algoritmo de control de diferencias temporales on-policy. Actualiza Q(s,a) asumiendo que la acción futura se tomará siguiendo la política actual.",
+      "parameters": {
+        "lr": {
+          "label": "Tasa de Aprendizaje (α)",
+          "type": "float",
+          "min": 0.01,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        },
+        "gamma": {
+          "label": "Factor de Descuento (γ)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.95,
+          "step": 0.01
+        },
+        "epsilon": {
+          "label": "Tasa de Exploración (ε)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        }
+      }
+    }
+  },
+  "cognitive": {
+    "ddm": {
+      "id": "ddm",
+      "name": "Drift Diffusion Model (DDM)",
+      "description": "Modelo continuo de acumulación de evidencia ruidosa en el tiempo para elecciones binarias de dos alternativas.",
+      "parameters": {
+        "drift_rate": {
+          "label": "Tasa de Deriva (v)",
+          "type": "float",
+          "min": -5.0,
+          "max": 5.0,
+          "default": 1.0,
+          "step": 0.1
+        },
+        "boundary": {
+          "label": "Separación de Umbrales (a)",
+          "type": "float",
+          "min": 0.1,
+          "max": 5.0,
+          "default": 2.0,
+          "step": 0.1
+        },
+        "starting_point": {
+          "label": "Punto de Partida (z/a)",
+          "type": "float",
+          "min": 0.1,
+          "max": 0.9,
+          "default": 0.5,
+          "step": 0.05
+        },
+        "non_decision_time": {
+          "label": "Tiempo no de decisión (t0)",
+          "type": "float",
+          "min": 0.0,
+          "max": 2.0,
+          "default": 0.2,
+          "step": 0.05
+        }
+      }
+    }
+  }
+}

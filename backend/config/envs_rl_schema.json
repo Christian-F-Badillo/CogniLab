@@ -1,0 +1,61 @@
+{
+  "rl_envs": {
+    "gridworld_maze": {
+      "id": "gridworld_maze",
+      "name": "Laberintos Discretos (GridWorld 10x10)",
+      "description": "Espacios de estados tabulares bidimensionales. Ideales para evaluar la propagación de funciones de valor discretas y la navegación espacial frente a cuellos de botella topológicos.",
+      "parameters": {
+        "maze_type": {
+          "label": "Topología del Laberinto",
+          "type": "select",
+          "options": [
+            {
+              "value": "open",
+              "label": "Control (Cielo Abierto)"
+            },
+            {
+              "value": "wall",
+              "label": "Cuello de Botella (Muro Único)"
+            },
+            {
+              "value": "rooms",
+              "label": "Cuatro Habitaciones (Sutton)"
+            },
+            {
+              "value": "u",
+              "label": "Trampa de Recompensa (Forma de U)"
+            },
+            {
+              "value": "zigzag",
+              "label": "Corredor Estocástico (Zig-Zag)"
+            }
+          ],
+          "default": "open"
+        },
+        "max_steps": {
+          "label": "Límite de Pasos (Truncamiento)",
+          "type": "int",
+          "min": 10,
+          "max": 1000,
+          "default": 100,
+          "step": 10
+        }
+      }
+    },
+    "continuous_games": {
+      "id": "cartpole",
+      "name": "CartPole (Cinemática Continua)",
+      "description": "Entorno clásico de control continuo. Un péndulo invertido sobre un carro móvil. Requiere aproximación de funciones (Deep RL). [PROXIMAMENTE]",
+      "parameters": {
+        "max_steps": {
+          "label": "Límite de Pasos",
+          "type": "int",
+          "min": 100,
+          "max": 5000,
+          "default": 500,
+          "step": 100
+        }
+      }
+    }
+  }
+}
