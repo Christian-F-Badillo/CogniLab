@@ -1,39 +1,41 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional, Union
-from ..types.data import ModelConfig, EnvStep
 import numpy as np
+from typing import Any, Dict, List
+from ..types.data import ModelConfig
 
 
 class Agent(ABC):
-    def __init__(self, config: Optional[ModelConfig] = None):
+    def __init__(self, config: ModelConfig):
         "Base Agent Class"
-        self._config = config
+        self._params = config.parameters
+        self._name = config.name
+        self._type = config.type
+        self._nactions = config.n_actions
+        self._nstates = config.n_states
 
     @abstractmethod
-    def act(
-        self, state: Union[np.ndarray, List[float]]
-    ) -> Union[int, float, List[Any]]:
+    def act(self, input: Dict[str, Any]) -> int | float | List[Any]:
         "Method of RL agent to act given the env state"
         pass
 
     @abstractmethod
-    def update(self, step: EnvStep) -> None:
+    def update(self, input: Dict[str, Any]) -> None:
         "Take the environment feedback to update the model parameters"
 
     @property
-    @abstractmethod
     def name(self) -> str:
         "Get the model name (id)"
-        pass
+        return self._name
 
     @name.setter
-    @abstractmethod
     def name(self, value: str) -> None:
         "Set the custom model name (id)"
-        pass
+        if not value:
+            raise ValueError("Agent::Model name empty")
+
+        self._name = value
 
     @property
-    @abstractmethod
     def type(self) -> str:
         "Type of Model"
-        pass
+        return self._type

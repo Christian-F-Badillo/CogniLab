@@ -1,12 +1,12 @@
-from typing import NamedTuple, Dict, Any, List, Union
-import numpy as np
+from typing import NamedTuple, Dict, Any, List
+from pydantic import BaseModel
 
 
 # RL Env Data
 class EnvStep(NamedTuple):
-    action: Union[int, float, List[Any]]
-    state: Union[np.ndarray, List[float]]
-    reward: float
+    action: Dict[str, Any] | List[Any] | float | int
+    state: Dict[str, Any]
+    reward: float | int | Any
     terminated: bool
     truncated: bool
     info: Dict[str, Any]
@@ -17,13 +17,20 @@ class EnvData(NamedTuple):
     data: Dict[str, List[Any]]
 
 
-# Model Config for UI
-class ModelConfigUI(NamedTuple):
+class ParameterSchema(BaseModel):
+    label: str
+    type: str  # 'float', 'int', 'boolean'
+    min: float | None = None
+    max: float | None = None
+    default: float | int | bool
+    step: float | None = None
+
+
+class ModelDefinition(BaseModel):
+    id: str
     name: str
-    type: str
-    parameters: Dict[
-        str, Dict[str, Any]
-    ]  # example: {'alpha': {'min': 0, 'max': 1, 'default': 0.1}}
+    description: str
+    parameters: Dict[str, ParameterSchema]
 
 
 # Model Config for backend
@@ -31,6 +38,8 @@ class ModelConfig(NamedTuple):
     name: str
     type: str
     parameters: Dict[str, Any]
+    n_actions: int
+    n_states: int
 
 
 # Results for Comparation in RL Experiments
