@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-import numpy as np
 from typing import Any, Dict, List
-from ..types.data import ModelConfig
+from ..schemas.data import ModelConfig
 
 
 class Agent(ABC):

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 from .wrappers import BaseUIWrapper
 from .baseAgent import Agent
-from ..types.data import ExperimentResultRL
+from ..schemas.data import ExperimentResultRL
 
 
 class BaseExperimentCoordinator(ABC):
@@ -150,4 +150,3 @@ class ExperimentCoordinatorRL(BaseExperimentCoordinator):
             hyperparameters=self.agent._params,
             timestamp=datetime.utcnow().isoformat(),
         )
-

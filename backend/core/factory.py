@@ -1,29 +1,37 @@
 # backend/core/factory.py
 from typing import Any, Dict, Type, Tuple, Optional, Callable, Awaitable
+import logging
+
+# Interfaces Base
+from .baseAgent import Agent
+from .wrappers import BaseUIWrapper
+
+# Coordinadores y Monitores Base
 from .coordinator import BaseExperimentCoordinator, ExperimentCoordinatorRL
 from .monitors import BaseResultMonitor, RLResultMonitor
 
+# Tipos para validación
+from backend.models.rl.TD import ModelConfig
+
 
 class ExperimentFactory:
-    """
-    Patrón Factory generalizado para construir contextos de simulación desde solicitudes JSON/API.
-    Utiliza registros dinámicos (Inversión de Control) para evitar acoplamiento rígido con
-    implementaciones específicas y soportar múltiples paradigmas (RL, DDM, Bayesianos).
-    """
-
     _MODELS_REGISTRY: Dict[str, Type[Any]] = {}
     _POLICIES_REGISTRY: Dict[str, Type[Any]] = {}
     _ENVS_REGISTRY: Dict[str, Type[Any]] = {}
     _WRAPPERS_REGISTRY: Dict[str, Type[Any]] = {}
 
-    # Registros del Core
     _COORDINATORS_REGISTRY: Dict[str, Type[BaseExperimentCoordinator]] = {
         "rl": ExperimentCoordinatorRL
     }
 
     _MONITORS_REGISTRY: Dict[str, Type[BaseResultMonitor]] = {"rl": RLResultMonitor}
 
-    # --- Métodos de Registro Dinámico ---
+    _SCHEMAS_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+    @classmethod
+    def register_schema(cls, schema_type: str, schema_dict: Dict[str, Any]):
+        """Registra metadatos de configuración (UI Configs)."""
+        cls._SCHEMAS_REGISTRY[schema_type] = schema_dict
 
     @classmethod
     def register_model(cls, name: str, model_cls: Type[Any]):
@@ -52,16 +60,22 @@ class ExperimentFactory:
         cls._MONITORS_REGISTRY[name] = monitor_cls
 
     @classmethod
+    def _validate_payload(cls, payload: Dict[str, Any], schema_type: str):
+        """
+        NOTA: Desactivamos jsonschema.validate() aquí porque los archivos JSON actuales
+        son configuraciones de UI (Frontend), no esquemas formales de validación backend.
+        Aquí a futuro se implementará validación Pydantic o JSONSchema estricto.
+        """
+        pass
+
+    @classmethod
     def _build_policy(cls, policy_config: Dict[str, Any]) -> Any:
         policy_id = policy_config.get("id")
         if policy_id not in cls._POLICIES_REGISTRY:
             raise ValueError(
-                f"Política no soportada o no registrada: '{policy_id}'. "
-                f"Disponibles: {list(cls._POLICIES_REGISTRY.keys())}"
+                f"Política no soportada: '{policy_id}'. Disponibles: {list(cls._POLICIES_REGISTRY.keys())}"
             )
-
-        params = policy_config.get("params", {})
-        return cls._POLICIES_REGISTRY[policy_id](**params)
+        return cls._POLICIES_REGISTRY[policy_id](**policy_config.get("params", {}))
 
     @classmethod
     def _build_agent(
@@ -69,20 +83,24 @@ class ExperimentFactory:
     ) -> Any:
         model_id = model_config.get("id")
         if model_id not in cls._MODELS_REGISTRY:
-            raise ValueError(
-                f"Modelo no soportado o no registrado: '{model_id}'. "
-                f"Disponibles: {list(cls._MODELS_REGISTRY.keys())}"
-            )
+            raise ValueError(f"Modelo no soportado: '{model_id}'.")
 
         params = model_config.get("params", {}).copy()
 
-        # Inyectar política dinámicamente si el modelo la pide
+        # Inyectar política
         if "policy" in model_config:
             params["policy"] = cls._build_policy(model_config["policy"])
 
-        # Inyectar metadatos del ambiente (ej. state_space) sólo si hay info disponible
-        # Esto permite que modelos que no usan ambiente (ej. generativos) no fallen
-        params.update(env_info)
+        # Reestructurar dependencias específicas de TDLearning / QLearningAgent
+        if "config" in params:
+            config_data = params.pop("config")
+
+            if "n_states" in env_info:
+                config_data["n_states"] = env_info["n_states"]
+            if "n_actions" in env_info:
+                config_data["n_actions"] = env_info["n_actions"]
+
+            params["config"] = ModelConfig(**config_data)
 
         return cls._MODELS_REGISTRY[model_id](**params)
 
@@ -90,20 +108,18 @@ class ExperimentFactory:
     def _build_environment(cls, env_config: Dict[str, Any]) -> Any:
         env_id = env_config.get("id")
         if env_id not in cls._ENVS_REGISTRY:
-            raise ValueError(f"Ambiente no soportado o no registrado: '{env_id}'")
+            raise ValueError(f"Ambiente no soportado: '{env_id}'")
 
-        params = env_config.get("params", {})
-        base_env = cls._ENVS_REGISTRY[env_id](**params)
+        base_env = cls._ENVS_REGISTRY[env_id](**env_config.get("params", {}))
 
-        # Aplicar wrapper si la solicitud lo especifica
         wrapper_config = env_config.get("wrapper")
         if wrapper_config:
             wrapper_id = wrapper_config.get("id")
             if wrapper_id in cls._WRAPPERS_REGISTRY:
-                wrapper_params = wrapper_config.get("params", {})
-                return cls._WRAPPERS_REGISTRY[wrapper_id](base_env, **wrapper_params)
-            else:
-                raise ValueError(f"Wrapper no soportado: '{wrapper_id}'")
+                return cls._WRAPPERS_REGISTRY[wrapper_id](
+                    base_env, **wrapper_config.get("params", {})
+                )
+            raise ValueError(f"Wrapper no soportado: '{wrapper_id}'")
 
         return base_env
 
@@ -115,34 +131,37 @@ class ExperimentFactory:
         on_step_cb: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         on_episode_cb: Optional[Callable[[int, float], Awaitable[None]]] = None,
     ) -> Tuple[BaseExperimentCoordinator, BaseResultMonitor]:
-        """
-        Punto de entrada genérico para construir CUALQUIER experimento.
-        Delegará a coordinadores específicos según 'experiment_type'.
-        """
         if experiment_type not in cls._COORDINATORS_REGISTRY:
             raise ValueError(f"Tipo de experimento '{experiment_type}' no registrado.")
 
-        # 1. Construir Ambiente (Opcional, depende del paradigma)
         env = None
         env_info = {}
         env_config = request_payload.get("environment")
 
         if env_config:
             env = cls._build_environment(env_config)
-            # Extracción agnóstica de propiedades para pasarlas al modelo
-            if hasattr(env, "states_idx"):
-                env_info["states_idx"] = env.states_idx
-            if hasattr(env, "actions_idx"):
-                env_info["actions_idx"] = env.actions_idx
 
-        # 2. Construir Modelo/Agente
+            # --- CÓDIGO LIMPIO ---
+            # Gracias a que DiscreteEnvUIWrapper implementa __getattr__,
+            # podemos acceder a las propiedades nativas sin romper la abstracción.
+            if hasattr(env, "observation_space") and hasattr(
+                env.observation_space, "n"
+            ):
+                env_info["n_states"] = env.observation_space.n
+            else:
+                logging.warning("El ambiente no expone observation_space.n")
+
+            if hasattr(env, "action_space") and hasattr(env.action_space, "n"):
+                env_info["n_actions"] = env.action_space.n
+            else:
+                logging.warning("El ambiente no expone action_space.n")
+
         model_config = request_payload.get("model")
         if not model_config:
-            raise ValueError("Configuración del modelo faltante en la solicitud.")
+            raise ValueError("Configuración del modelo faltante.")
 
         model = cls._build_agent(model_config, env_info)
 
-        # 3. Preparar Coordinador
         run_config = request_payload.get("run_params", {})
         CoordinatorClass = cls._COORDINATORS_REGISTRY[experiment_type]
 
@@ -153,23 +172,18 @@ class ExperimentFactory:
             "on_episode_cb": on_episode_cb,
         }
 
-        # Inyección condicional de dependencias según el tipo de experimento
         if experiment_type == "rl":
             if env is None:
-                raise ValueError("Experimento RL requiere un 'environment'.")
+                raise ValueError("RL requiere 'environment'.")
             coordinator_kwargs["agent"] = model
             coordinator_kwargs["wrapper"] = env
         else:
-            # Para paradigmas no-RL (donde el ambiente puede ser None)
             coordinator_kwargs["model"] = model
             if env is not None:
                 coordinator_kwargs["environment"] = env
 
         coordinator = CoordinatorClass(**coordinator_kwargs)
-
-        # 4. Preparar Monitor
         MonitorClass = cls._MONITORS_REGISTRY.get(experiment_type, BaseResultMonitor)
-        # TODO: Leer el directorio de salida (output_dir) de run_config si existe
         monitor = MonitorClass()
 
         return coordinator, monitor

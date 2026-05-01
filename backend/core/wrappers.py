@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import gymnasium as gym
-from ..types.data import EnvStep
+from ..schemas.data import EnvStep
 from typing import Any
 
 

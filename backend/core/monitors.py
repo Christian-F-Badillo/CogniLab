@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from ..types.data import ExperimentResultRL
+from ..schemas.data import ExperimentResultRL
 
 
 class BaseResultMonitor(ABC):
