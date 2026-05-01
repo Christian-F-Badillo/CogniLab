@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CogniLab API Tester - Reinforcement Learning</title>
+  <!-- Tailwind CSS para estilado rápido -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Estilos específicos para la grilla del laberinto */
+    #grid-container {
+      display: grid;
+      gap: 2px;
+      background-color: #e5e7eb;
+      border: 2px solid #9ca3af;
+      padding: 2px;
+    }
+
+    .cell {
+      width: 30px;
+      height: 30px;
+      background-color: white;
+      transition: background-color 0.1s ease;
+    }
+
+    .cell.wall {
+      background-color: #374151;
+    }
+
+    .cell.start {
+      background-color: #3b82f6;
+    }
+
+    .cell.goal {
+      background-color: #10b981;
+    }
+
+    .cell.agent {
+      background-color: #ef4444;
+      border-radius: 50%;
+      transform: scale(0.8);
+    }
+
+    /* Ocultar barra de scroll en logs */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 h-screen flex flex-col font-sans">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 text-white p-4 shadow-md flex justify-between items-center">
+    <h1 class="text-xl font-bold">CogniLab Headless Client</h1>
+    <div class="flex items-center gap-2">
+      <span id="ws-status" class="w-3 h-3 rounded-full bg-red-500"></span>
+      <span id="ws-text" class="text-sm font-medium">Desconectado</span>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="flex-1 flex overflow-hidden">
+
+    <!-- Panel Izquierdo: Configuración e Interfaz -->
+    <aside class="w-1/3 bg-white p-6 shadow-lg overflow-y-auto z-10 flex flex-col gap-6">
+
+      <section>
+        <h2 class="text-lg font-semibold border-b pb-2 mb-4">Configuración del Experimento</h2>
+
+        <div class="space-y-4 text-sm">
+          <div>
+            <label class="block font-medium text-gray-700">Topología del Laberinto</label>
+            <select id="maze-type"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+              <option value="open">Cielo Abierto</option>
+              <option value="wall">Muro Único</option>
+              <option value="rooms">Cuatro Habitaciones</option>
+              <option value="u" selected>Trampa U-Shape</option>
+              <option value="zigzag">Zig-Zag</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-medium text-gray-700">Episodios</label>
+              <input type="number" id="n-episodes" value="50"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700">Delay (ms)</label>
+              <input type="number" id="step-delay" value="20"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"
+                title="Milisegundos entre pasos">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-medium text-gray-700">Learning Rate (α)</label>
+              <input type="number" step="0.01" id="param-lr" value="0.1"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700">Epsilon (ε)</label>
+              <input type="number" step="0.01" id="param-epsilon" value="0.2"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="mt-auto">
+        <button id="btn-start"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Iniciar Simulación (Q-Learning)
+        </button>
+      </div>
+
+      <!-- Mini-Dashboard de Resultados -->
+      <section class="bg-gray-50 p-4 rounded-lg border">
+        <h3 class="text-sm font-bold text-gray-600 mb-2">Métricas en Tiempo Real</h3>
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <div class="bg-white p-2 rounded shadow-sm">
+            <div class="text-xs text-gray-500">Episodio Actual</div>
+            <div id="metric-ep" class="text-xl font-bold text-indigo-600">0 / 0</div>
+          </div>
+          <div class="bg-white p-2 rounded shadow-sm">
+            <div class="text-xs text-gray-500">Pasos en Ep.</div>
+            <div id="metric-steps" class="text-xl font-bold text-blue-600">0</div>
+          </div>
+          <div class="bg-white p-2 rounded shadow-sm col-span-2">
+            <div class="text-xs text-gray-500">Recompensa Último Ep.</div>
+            <div id="metric-reward" class="text-xl font-bold text-green-600">0.00</div>
+          </div>
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- Panel Central: Renderizado del Laberinto -->
+    <section class="w-1/3 bg-gray-200 flex items-center justify-center border-r border-l border-gray-300 relative">
+      <div id="grid-container" style="grid-template-columns: repeat(10, 1fr);">
+        <!-- Celdas generadas por JS -->
+      </div>
+
+      <!-- Overlay de carga -->
+      <div id="loading-overlay" class="absolute inset-0 bg-white/80 flex items-center justify-center hidden">
+        <div class="text-indigo-600 font-bold text-lg animate-pulse">Procesando...</div>
+      </div>
+    </section>
+
+    <!-- Panel Derecho: Log del WebSocket -->
+    <aside class="w-1/3 bg-gray-900 text-green-400 p-4 font-mono text-xs overflow-y-auto no-scrollbar flex flex-col">
+      <h2 class="text-gray-400 font-bold mb-2 uppercase tracking-wider sticky top-0 bg-gray-900 py-1">Terminal WebSocket
+      </h2>
+      <div id="console-log" class="flex-1 overflow-y-auto break-words flex flex-col gap-1">
+        <div class="text-gray-500">> Esperando conexión...</div>
+      </div>
+    </aside>
+
+  </main>
+
+  <script>
+    // --- Referencias UI ---
+    const btnStart = document.getElementById('btn-start');
+    const wsStatus = document.getElementById('ws-status');
+    const wsText = document.getElementById('ws-text');
+    const consoleLog = document.getElementById('console-log');
+    const gridContainer = document.getElementById('grid-container');
+
+    const metricEp = document.getElementById('metric-ep');
+    const metricSteps = document.getElementById('metric-steps');
+    const metricReward = document.getElementById('metric-reward');
+
+    // --- Estado de Conexión ---
+    let ws = null;
+    let isSimulating = false;
+    let currentSteps = 0;
+    let totalEpisodes = 0;
+
+    // --- Utilidades de la Terminal ---
+    function logToConsole(message, type = 'info') {
+      const el = document.createElement('div');
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+
+      let colorClass = 'text-green-400';
+      if (type === 'error') colorClass = 'text-red-500';
+      if (type === 'system') colorClass = 'text-blue-400';
+      if (type === 'warn') colorClass = 'text-yellow-400';
+
+      el.className = colorClass;
+      el.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> ${message}`;
+
+      consoleLog.appendChild(el);
+      consoleLog.scrollTop = consoleLog.scrollHeight;
+    }
+
+    // --- Topologías Harcodeadas para Render Inicial (Visual) ---
+    // Coinciden con tu archivo _mazes_types.py para que la UI sepa dibujar los muros
+    const MAZES = {
+      'u': [
+        "S.......#G",
+        "........#.",
+        "........#.",
+        "####....#.",
+        "...#....#.",
+        "...#....#.",
+        "...#....#.",
+        "...#....#.",
+        "...#......",
+        "...#######"
+      ],
+      'open': [
+        "S.........", "..........", "..........", "..........", "..........",
+        "..........", "..........", "..........", "..........", ".........G"
+      ],
+      'wall': [
+        "S.........", "..........", "..........", "#####.####", ".........#",
+        "#.........", "..........", "..........", "..........", ".........G"
+      ],
+      'rooms': [
+        "S...#.....", "....#.....", "....#.....", ".... .....", "#####.####",
+        "....#.....", "....#.....", ".... .....", "....#.....", "....#....G"
+      ],
+      'zigzag': [
+        "S########.", ".........#", "#.########", "#........#", "########.#",
+        ".........#", "#.########", "#........#", "########.#", ".........G"
+      ]
+    };
+
+    // --- Controladores del DOM ---
+    function drawGrid(mazeType) {
+      gridContainer.innerHTML = '';
+      const layout = MAZES[mazeType];
+
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.id = `cell-${r}-${c}`;
+
+          const char = layout[r][c];
+          if (char === '#') cell.classList.add('wall');
+          else if (char === 'S') cell.classList.add('start');
+          else if (char === 'G') cell.classList.add('goal');
+
+          gridContainer.appendChild(cell);
+        }
+      }
+    }
+
+    function updateAgentPosition(row, col) {
+      // Limpiar agente anterior
+      const prevAgent = document.querySelector('.cell.agent');
+      if (prevAgent) prevAgent.classList.remove('agent');
+
+      // Dibujar nuevo agente (evitando error si sale del index por un bug residual)
+      const targetCell = document.getElementById(`cell-${row}-${col}`);
+      if (targetCell) {
+        targetCell.classList.add('agent');
+      }
+    }
+
+    // --- Lógica WebSocket ---
+    function connect() {
+      // Ajustar el puerto si FastAPI corre en otro lugar
+      ws = new WebSocket('ws://localhost:8000/ws/simulate');
+
+      ws.onopen = () => {
+        wsStatus.classList.replace('bg-red-500', 'bg-green-500');
+        wsText.textContent = 'Conectado';
+        btnStart.disabled = false;
+        logToConsole('Conectado al servidor FastAPI', 'system');
+      };
+
+      ws.onclose = () => {
+        wsStatus.classList.replace('bg-green-500', 'bg-red-500');
+        wsText.textContent = 'Desconectado';
+        btnStart.disabled = true;
+        logToConsole('Conexión cerrada. Intentando reconectar en 3s...', 'warn');
+        isSimulating = false;
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (err) => {
+        logToConsole('Error de WebSocket.', 'error');
+      };
+
+      ws.onmessage = (event) => {
+        const response = JSON.parse(event.data);
+
+        switch (response.type) {
+          case 'SYSTEM':
+            logToConsole(response.message, 'system');
+            break;
+
+          case 'STEP':
+            currentSteps++;
+            metricSteps.textContent = currentSteps;
+
+            // Parsear posición inyectada por DiscreteEnvUIWrapper
+            const pos = response.data.state.agent_pos;
+            if (pos) {
+              updateAgentPosition(pos[0], pos[1]);
+            }
+
+            // Opcional: loguear steps (puede ser muy ruidoso)
+            // logToConsole(`Step | R: ${response.data.reward.toFixed(2)}`);
+            break;
+
+          case 'EPISODE_SUMMARY':
+            const ep = response.data.episode + 1; // 0-indexed a 1-indexed
+            metricEp.textContent = `${ep} / ${totalEpisodes}`;
+            metricReward.textContent = response.data.reward.toFixed(2);
+            currentSteps = 0; // Resetear contador para el próximo episodio
+
+            logToConsole(`Episodio ${ep} finalizado | Retorno: ${response.data.reward.toFixed(2)}`);
+            break;
+
+          case 'EXPERIMENT_COMPLETE':
+            isSimulating = false;
+            btnStart.disabled = false;
+            btnStart.textContent = "Iniciar Simulación";
+            logToConsole('Simulación Terminada Exitosamente', 'system');
+            logToConsole(`Archivo guardado: ${response.saved_file}`, 'system');
+            break;
+
+          case 'ERROR':
+          case 'FATAL_ERROR':
+            isSimulating = false;
+            btnStart.disabled = false;
+            btnStart.textContent = "Iniciar Simulación";
+            logToConsole(response.message, 'error');
+            break;
+        }
+      };
+    }
+
+    // --- Interacciones del Usuario ---
+    btnStart.addEventListener('click', () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      if (isSimulating) {
+        // TODO: Enviar comando de Stop al backend
+        return;
+      }
+
+      const mazeType = document.getElementById('maze-type').value;
+      totalEpisodes = parseInt(document.getElementById('n-episodes').value);
+      const delayMs = parseInt(document.getElementById('step-delay').value);
+
+      // Re-dibujar grilla base
+      drawGrid(mazeType);
+
+      // Resetear UI
+      metricEp.textContent = `0 / ${totalEpisodes}`;
+      metricSteps.textContent = "0";
+      currentSteps = 0;
+
+      // Construir Payload estricto para la Factory
+      const payload = {
+        "command": "START_EXPERIMENT",
+        "experiment_type": "rl",
+        "environment": {
+          "id": "gridworld_maze",
+          "params": {"type": mazeType, "max_steps": 150},
+          "wrapper": {"id": "discrete_ui"}
+        },
+        "model": {
+          "id": "q_learning",
+          "params": {
+            "config": {
+              "name": "Q-Learning",
+              "type": "TD",
+              "parameters": {
+                "lr": parseFloat(document.getElementById('param-lr').value),
+                "gamma": 0.95
+              }
+            }
+          },
+          "policy": {
+            "id": "epsilon_greedy",
+            "params": {
+              "epsilon": parseFloat(document.getElementById('param-epsilon').value)
+            }
+          }
+        },
+        "run_params": {
+          "episodes": totalEpisodes,
+          "step_delay": delayMs / 1000.0 // Backend espera segundos
+        }
+      };
+
+      ws.send(JSON.stringify(payload));
+      isSimulating = true;
+      btnStart.disabled = true;
+      btnStart.textContent = "Simulando...";
+    });
+
+    // Cambiar grilla en vivo al seleccionar el menú
+    document.getElementById('maze-type').addEventListener('change', (e) => {
+      if (!isSimulating) drawGrid(e.target.value);
+    });
+
+    // Inicialización
+    drawGrid('u');
+    connect();
+
+  </script>
+</body>
+
+</html>
