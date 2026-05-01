@@ -141,11 +141,11 @@ class MazeEnv(AbstractDiscreteEnv):
 
             if self.maze[new_row, new_col] == 3:
                 # Condición de Absorción: Alcanzó la meta
-                self.reward = 10.0
+                self.reward = 20.0
                 self.terminated = True
             else:
                 # Condición de Costo Constante: Incentivo de ruta mínima
-                self.reward = -0.01
+                self.reward = -0.5
 
         # Mantenimiento de reloj de la simulación
         self.steps += 1
