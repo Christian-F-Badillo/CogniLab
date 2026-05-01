@@ -17,10 +17,10 @@ async def run_test():
             "wrapper": {"id": "discrete_ui"},
         },
         "model": {
-            "id": "q_learning",
+            "id": "sarsa",
             "params": {
                 "config": {
-                    "name": "Q-Learning Grid zigzag",
+                    "name": "Sarsa Grid zigzag",
                     "type": "TD",
                     "parameters": {"lr": 0.1, "gamma": 0.8},
                     "n_actions": 4,
