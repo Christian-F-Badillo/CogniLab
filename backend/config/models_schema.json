@@ -20,14 +20,6 @@
           "max": 1.0,
           "default": 0.95,
           "step": 0.01
-        },
-        "epsilon": {
-          "label": "Tasa de Exploración (ε)",
-          "type": "float",
-          "min": 0.0,
-          "max": 1.0,
-          "default": 0.1,
-          "step": 0.01
         }
       }
     },
@@ -50,14 +42,6 @@
           "min": 0.0,
           "max": 1.0,
           "default": 0.95,
-          "step": 0.01
-        },
-        "epsilon": {
-          "label": "Tasa de Exploración (ε)",
-          "type": "float",
-          "min": 0.0,
-          "max": 1.0,
-          "default": 0.1,
           "step": 0.01
         }
       }
