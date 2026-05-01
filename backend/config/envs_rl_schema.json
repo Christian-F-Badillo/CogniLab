@@ -5,7 +5,7 @@
       "name": "Laberintos Discretos (GridWorld 10x10)",
       "description": "Espacios de estados tabulares bidimensionales. Ideales para evaluar la propagación de funciones de valor discretas y la navegación espacial frente a cuellos de botella topológicos.",
       "parameters": {
-        "maze_type": {
+        "type": {
           "label": "Topología del Laberinto",
           "type": "select",
           "options": [

@@ -45,6 +45,68 @@
           "step": 0.01
         }
       }
+    },
+    "n_sarsa": {
+      "id": "n_sarsa",
+      "name": "N-Steps-SARSA",
+      "description": "Algoritmo de control de diferencias temporales on-policy. Utiliza n pasos para actualizar la función de valor.",
+      "parameters": {
+        "lr": {
+          "label": "Tasa de Aprendizaje (α)",
+          "type": "float",
+          "min": 0.01,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        },
+        "gamma": {
+          "label": "Factor de Descuento (γ)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.95,
+          "step": 0.01
+        },
+        "n_steps": {
+          "label": "Número de Pasos (n)",
+          "type": "integer",
+          "min": 1,
+          "max": 10,
+          "default": 3,
+          "step": 1
+        }
+      }
+    },
+    "n_q_learning": {
+      "id": "n_q_learning",
+      "name": "N-Steps-Q-Learning",
+      "description": "Algoritmo de control de diferencias temporales off-policy. Utiliza n pasos para actualizar la función de valor usando el algoritmo Tree Backup de Sutton y Barto.",
+      "parameters": {
+        "lr": {
+          "label": "Tasa de Aprendizaje (α)",
+          "type": "float",
+          "min": 0.01,
+          "max": 1.0,
+          "default": 0.1,
+          "step": 0.01
+        },
+        "gamma": {
+          "label": "Factor de Descuento (γ)",
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0,
+          "default": 0.95,
+          "step": 0.01
+        },
+        "n_steps": {
+          "label": "Número de Pasos (n)",
+          "type": "integer",
+          "min": 1,
+          "max": 10,
+          "default": 3,
+          "step": 1
+        }
+      }
     }
   },
   "cognitive": {
