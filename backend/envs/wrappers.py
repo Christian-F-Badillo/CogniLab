@@ -1,11 +1,21 @@
 from ..core.wrappers import BaseUIWrapper
 from ..core.env_interfaces import AbstractDiscreteEnv
-from ..types.data import EnvStep
+from ..schemas.data import EnvStep
 
 
 class DiscreteEnvUIWrapper(BaseUIWrapper):
     def __init__(self, env: AbstractDiscreteEnv) -> None:
         self.env = env
+
+    def __getattr__(self, name: str):
+        """
+        Patrón Proxy Transparente:
+        Delega atributos inexistentes al entorno base.
+        Permite a la Factoría leer env.observation_space sin romper abstracción.
+        """
+        if name.startswith("_"):
+            raise AttributeError(f"Acceso a atributo privado '{name}' denegado.")
+        return getattr(self.env, name)
 
     def reset(self, seed: int | None = None) -> tuple[int, EnvStep]:
         """Retorna (estado_puro_para_agente, datos_visuales_para_ui)"""
@@ -32,7 +42,7 @@ class DiscreteEnvUIWrapper(BaseUIWrapper):
         ui_step = EnvStep(
             action=action,
             state=ui_state,
-            reward=float(reward),
+            reward=reward,
             terminated=term,
             truncated=trunc,
             info=info,

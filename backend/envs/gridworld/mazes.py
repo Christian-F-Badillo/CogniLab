@@ -2,7 +2,7 @@ from typing import Any, Dict, Tuple
 import gymnasium as gym
 import numpy as np
 from ...core.env_interfaces import AbstractDiscreteEnv
-from _mazes_types import (
+from ._mazes_types import (
     MazeType,
     MAZE_FOUR_ROOMS,
     MAZE_OPEN,
@@ -22,106 +22,43 @@ mazes = {
 
 class MazeEnv(AbstractDiscreteEnv):
     """
-    Custom Maze Environment
+    Custom Maze Environment para Modelamiento Tabular
+    Implementa funciones de transición y recompensa restrictivas.
     """
 
     def __init__(self, type: MazeType, max_steps: int = 100) -> None:
-        # Maze Information
+        # Información del Laberinto
         self.type = type
         self.max_steps = max_steps
         self.maze = self._parse_maze(mazes[type])
 
-        # Agent information
-        # - Get the position of the agent Spawn with a np.ndarray
+        # Información del Agente
         self._agent_position = np.array([-1, -1], dtype=np.int8)
         self._target_position = np.array([-1, -1], dtype=np.int8)
 
-        # Maze shape
+        # Dimensiones topológicas
         self.rows, self.cols = self.maze.shape
 
-        # Observation Space
+        # Espacios del estándar Gymnasium
         self.observation_space = gym.spaces.Discrete(self.rows * self.cols)
-
-        # Actions
         self.action_space = gym.spaces.Discrete(4)
-        self._action_to_direction = {
-            0: np.array([0, 1]),  # Right
-            1: np.array([-1, 0]),  # Up
-            2: np.array([0, -1]),  # Left
-            3: np.array([1, 0]),  # Down
-        }
-
-        # Env Step info
-        self.reward = 0.0
-        self.terminated = False
-        self.truncated = False
-        self.steps = 0
-
-    def step(self, action: int) -> tuple[int, float, bool, bool, dict]:
-        """
-        Execute the action over the maze
-        """
-
-        self.steps += 1
-
-        if self.steps == self.max_steps:
-            self.truncated = True
-
-        # Map action to direction
-        direction = self._action_to_direction[action]
-
-        # Proposed new state
-        new_position = self._agent_position + direction
-        bounderies_mask = (
-            (new_position[0] < 0)
-            | (new_position[0] > 9)
-            | (new_position[1] < 0)
-            | (new_position[1] > 9)
-        )
-        if bounderies_mask:
-            out_bounderies = True
-            is_free = False
-        else:
-            out_bounderies = False
-            is_free = self.maze[new_position[0], new_position[1]] != 1
-
-        # Checking bounderies
-        if bounderies_mask or not is_free:
-            out_bounderies = True
-            self.reward = -2.0
-            observation = self._get_obs()
-            info = self._get_info()
-            info["out_boundaries"] = out_bounderies
-            self.terminated = False
-
-            return observation, self.reward, self.terminated, self.truncated, info
-
-        self._agent_position += direction
-        out_bounderies = False
-        observation = self._get_obs()
-
-        self.terminated = np.array_equal(self._agent_position, self._target_position)
-        self.reward = 10 if self.terminated else -1.0
-
-        info = self._get_info()
-        info["out_boundaries"] = out_bounderies
-
-        return observation, self.reward, self.terminated, self.truncated, info
 
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
-    ) -> Tuple[int, dict[str, Any]]:
+    ) -> tuple[int, dict[str, Any]]:
         """
-        Reset the environment for each maze type.
+        Reinicializa la topología de la simulación.
         """
-        np.random.seed(seed)
+        if seed is not None:
+            np.random.seed(seed)
 
         self._agent_position = np.argwhere(self.maze == 2)[0]
         self._target_position = np.argwhere(self.maze == 3)[0]
 
         observation = self._get_obs()
         info = self._get_info()
-        # Env Step info
+
+        # Inicialización de métricas del MDP
         self.reward = 0.0
         self.terminated = False
         self.truncated = False
@@ -134,10 +71,9 @@ class MazeEnv(AbstractDiscreteEnv):
         return self.maze.shape
 
     def _get_info(self) -> Dict[str, Any]:
-        """Compute auxiliary information for debugging.
-
-        Returns:
-            dict: Info with distance between agent and target
+        """
+        Computa información auxiliar, como la distancia de Manhattan (Norma L1)
+        útil para análisis cognitivos o funciones heurísticas.
         """
         return {
             "distance": np.linalg.norm(
@@ -147,19 +83,79 @@ class MazeEnv(AbstractDiscreteEnv):
 
     def _get_obs(self) -> int:
         row, col = self._agent_position
-
         return self._encode_state(row, col)
+
+    def _encode_state(self, row: int, col: int) -> int:
+        """Proyección de espacio de coordenadas 2D a un escalar unidimensional."""
+        return int(row * self.cols + col)
+
+    def _decode_state(self, state: int) -> Tuple[int, int]:
+        """Proyección inversa del escalar a coordenadas en la grilla."""
+        return int(state // self.cols), int(state % self.cols)
 
     def _parse_maze(self, maze_layout: list[str]) -> np.ndarray:
         """
-        Map maze text to matrix with using the standar:
-        0: Free (.), 1: Obstacule (#), 2: Spawn (S), 3: Goal (G)
+        Mapea el texto del laberinto a un tensor.
+        0: Libre, 1: Muro, 2: Inicio, 3: Meta
         """
-        mapping = {".": 0, "#": 1, "S": 2, "G": 3}
-        matrix = np.zeros((10, 10), dtype=np.int8)
+        mapping = {".": 0, "#": 1, "S": 2, "G": 3, " ": 0}
+        maze_matrix = []
+        for row in maze_layout:
+            maze_matrix.append([mapping.get(char, 0) for char in row])
+        return np.array(maze_matrix, dtype=np.int8)
 
-        for i, row in enumerate(maze_layout):
-            for j, char in enumerate(row):
-                matrix[i, j] = mapping[char]
+    def step(self, action: int) -> Tuple[int, float, bool, bool, Dict[str, Any]]:
+        """
+        Evalúa la transición del MDP P(s', r | s, a).
+        """
+        row, col = self._agent_position
+        new_row, new_col = row, col
 
-        return matrix
+        # Mapeo cinemático: 0: Arriba, 1: Derecha, 2: Abajo, 3: Izquierda
+        if action == 0:
+            new_row -= 1
+        elif action == 1:
+            new_col += 1
+        elif action == 2:
+            new_row += 1
+        elif action == 3:
+            new_col -= 1
+
+        # 1. Detección de Colisión Límite Lógica (Fuera de la matriz)
+        hit_boundary = not (0 <= new_row < self.rows and 0 <= new_col < self.cols)
+
+        # Estabilizador Numérico: Previene OutOfBounds en tensores de Numpy subyacentes
+        new_row = max(0, min(self.rows - 1, new_row))
+        new_col = max(0, min(self.cols - 1, new_col))
+
+        # 2. Detección de Colisión Física (Muros internos)
+        hit_wall = self.maze[new_row, new_col] == 1
+
+        # 3. Lógica de Evaluación de Recompensas
+        if hit_boundary or hit_wall:
+            # Castigo por chocar. El estado se revierte implícitamente al no actualizar _agent_position.
+            self.reward = -1.0
+        else:
+            # Transición de estado válida
+            self._agent_position = np.array([new_row, new_col])
+
+            if self.maze[new_row, new_col] == 3:
+                # Condición de Absorción: Alcanzó la meta
+                self.reward = 10.0
+                self.terminated = True
+            else:
+                # Condición de Costo Constante: Incentivo de ruta mínima
+                self.reward = -0.01
+
+        # Mantenimiento de reloj de la simulación
+        self.steps += 1
+        if self.steps >= self.max_steps:
+            self.truncated = True
+
+        return (
+            self._get_obs(),
+            self.reward,
+            self.terminated,
+            self.truncated,
+            self._get_info(),
+        )
