@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict, List, Any
 from ...core.baseAgent import Agent
-from ...types.data import ModelConfig
+from ...schemas.data import ModelConfig
 from .policies import BasePolicy
 
 
