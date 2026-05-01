@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 from .factory import ExperimentFactory
-from backend.models.rl.TD import QLearningAgent, SarsaAgent
+from backend.models.rl.TD import QLearningAgent, SarsaAgent, NStepSarsaAgent, TreeBackupAgent
 from backend.models.rl.policies import EpsilonGreedyPolicy, GreedyPolicy, SoftmaxPolicy
 from backend.envs.gridworld.mazes import MazeEnv
 from backend.envs.wrappers import DiscreteEnvUIWrapper
@@ -18,7 +18,8 @@ def register_simulation_dependencies():
     # Registrar Modelos
     ExperimentFactory.register_model("q_learning", QLearningAgent)
     ExperimentFactory.register_model("sarsa", SarsaAgent)
-
+    ExperimentFactory.register_model("n_step_sarsa", NStepSarsaAgent)
+    ExperimentFactory.register_model("n_q_learning", TreeBackupAgent)
     # Registrar Políticas
     ExperimentFactory.register_policy("epsilon_greedy", EpsilonGreedyPolicy)
     ExperimentFactory.register_policy("greedy", GreedyPolicy)
