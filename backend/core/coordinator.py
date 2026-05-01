@@ -28,6 +28,7 @@ class BaseExperimentCoordinator(ABC):
         self.on_step_cb = on_step_cb
         self.on_episode_cb = on_episode_cb
         self.is_running = False
+        self.was_stopped = False
 
     @abstractmethod
     async def run(self) -> Any:
@@ -40,6 +41,7 @@ class BaseExperimentCoordinator(ABC):
     def stop(self) -> None:
         """Interrupción forzada (ej. cancelación desde la UI o monitor)"""
         self.is_running = False
+        self.was_stopped = True
 
     async def _handle_async_flow(self) -> None:
         """
@@ -53,11 +55,6 @@ class BaseExperimentCoordinator(ABC):
 
 
 class ExperimentCoordinatorRL(BaseExperimentCoordinator):
-    """
-    Orquestador específico para Procesos de Decisión de Markov (MDP) en Reinforcement Learning.
-    Desacopla la lógica matemática del agente/ambiente de la capa de transporte.
-    """
-
     def __init__(
         self,
         agent: Agent,
@@ -67,24 +64,15 @@ class ExperimentCoordinatorRL(BaseExperimentCoordinator):
         on_step_cb: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
         on_episode_cb: Optional[Callable[[int, float], Awaitable[None]]] = None,
     ):
-        super().__init__(
-            n_episodes=n_episodes,
-            step_delay=step_delay,
-            on_step_cb=on_step_cb,
-            on_episode_cb=on_episode_cb,
-        )
-
+        super().__init__(n_episodes, step_delay, on_step_cb, on_episode_cb)
         self.agent = agent
         self.wrapper = wrapper
-
         self.rewards_history: List[float] = []
         self.steps_per_episode: List[int] = []
 
     async def run(self) -> ExperimentResultRL:
-        """
-        Ejecuta N episodios del MDP.
-        """
         self.is_running = True
+        self.was_stopped = False
 
         for episode in range(self.n_episodes):
             if not self.is_running:
@@ -92,51 +80,38 @@ class ExperimentCoordinatorRL(BaseExperimentCoordinator):
 
             episode_reward = 0.0
             steps = 0
-
-            # Inicialización S_0
             curr_state_int, ui_step = self.wrapper.reset()
 
             if self.on_step_cb:
                 await self.on_step_cb(ui_step._asdict())
 
             while self.is_running:
-                # Selección de acción
                 action = self.agent.act({"current_state": curr_state_int})
-
-                # Transición del ambiente
                 next_state_int, ui_step = self.wrapper.step(action)
 
-                # Actualización de parámetros
-                self.agent.update(
-                    {
-                        "current_state": curr_state_int,
-                        "next_state": next_state_int,
-                        "reward": ui_step.reward,
-                        "action": action,
-                        "done": ui_step.terminated or ui_step.truncated,
-                    }
-                )
+                self.agent.update({
+                    "current_state": curr_state_int,
+                    "next_state": next_state_int,
+                    "reward": ui_step.reward,
+                    "action": action,
+                    "done": ui_step.terminated or ui_step.truncated,
+                })
 
-                # Acumulación de métricas
                 episode_reward += ui_step.reward
                 steps += 1
 
-                # Emisión de eventos
                 if self.on_step_cb:
                     await self.on_step_cb(ui_step._asdict())
 
-                # Actualización de estado
                 curr_state_int = next_state_int
-
-                # Control asíncrono heredado
                 await self._handle_async_flow()
 
                 if ui_step.terminated or ui_step.truncated:
                     break
 
-            # Registro de métricas del episodio
-            self.rewards_history.append(episode_reward)
-            self.steps_per_episode.append(steps)
+            if not self.was_stopped:
+                self.rewards_history.append(episode_reward)
+                self.steps_per_episode.append(steps)
 
             if self.on_episode_cb:
                 await self.on_episode_cb(episode, episode_reward)

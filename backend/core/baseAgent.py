@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 from ..schemas.data import ModelConfig
+import pickle
 
 
 class Agent(ABC):
@@ -20,6 +21,23 @@ class Agent(ABC):
     @abstractmethod
     def update(self, input: Dict[str, Any]) -> None:
         "Take the environment feedback to update the model parameters"
+
+    def save_state(self, filepath: str) -> None:
+        """
+        Serializa el estado matemático completo del agente (pesos, matrices, hiperparámetros).
+        Utiliza el dict interno para ser agnóstico a implementaciones futuras (RL, DDM, etc.).
+        """
+        with open(filepath, 'wb') as f:
+            pickle.dump(self.__dict__, f)
+
+    def load_state(self, filepath: str) -> None:
+        """
+        Rehidrata el estado del agente desde el sistema de archivos.
+        Garantiza que la Propiedad de Markov se mantenga entre sesiones pausadas.
+        """
+        with open(filepath, 'rb') as f:
+            state = pickle.load(f)
+            self.__dict__.update(state)
 
     @property
     def name(self) -> str:
